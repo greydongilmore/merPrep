@@ -152,4 +152,4 @@ Project Link: [https://github.com/trajectoryGuide/merPrep](https://github.com/tr
 [issues-shield]: https://img.shields.io/github/issues/trajectoryGuide/merPrep.svg?style=for-the-badge
 [issues-url]: https://github.com/trajectoryGuide/merPrep/issues
 [license-shield]: https://img.shields.io/github/license/trajectoryGuide/merPrep.svg?style=for-the-badge
-[license-url]: https://github.com/trajectoryGuide/merPrep/blob/master/LICENSE.txt
+[license-url]: https://github.com/trajectoryGuide/merPrep/blob/master/LICENSE
