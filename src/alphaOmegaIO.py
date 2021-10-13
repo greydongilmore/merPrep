@@ -5,6 +5,7 @@ Created on Tue Sep  1 20:19:44 2020
 
 @author: greydon
 """
+
 import numpy as np
 import os
 import struct
@@ -205,7 +206,7 @@ class alphaOmegaIO:
 			pos_block += m_length
 			fid.seek(pos_block)
 		
-		# step 2: find the available channels
+		# find the available channels
 		list_chan = []  # list containing indexes of channel blocks
 		chan_labels=[]
 		for ind_block, block in enumerate(file_blocks):
@@ -221,7 +222,7 @@ class alphaOmegaIO:
 			for ichan in chansKeep:
 				channelsKeep[ichan.split('/')[0].strip()]=ichan
 			
-		# step 3: find blocks containing data for the available channels
+		# find blocks containing data for the available channels
 		list_data = []  # list of lists of indexes of data blocks
 		# corresponding to each channel
 		for ind_chan, chan in enumerate(list_chan):
@@ -232,20 +233,20 @@ class alphaOmegaIO:
 					if block['m_numChannel'] == num_chan:
 						list_data[ind_chan].append(ind_block)
 		
-		# step 4: compute the length (number of samples) of the channels
+		# compute number of samples for the channels
 		chan_len = np.zeros(len(list_data), dtype=np.int)
 		for ind_chan, list_blocks in enumerate(list_data):
 			for ind_block in list_blocks:
 				chan_len[ind_chan] += count_samples(
 					file_blocks[ind_block]['m_length'])
 		
-		# step 5: find channels for which data are available
+		# find channels with available data
 		ind_valid_chan = np.nonzero(chan_len)[0]
 		
-		# step 6: load the data
-		# TODO give the possibility to load data as AnalogSignalArrays
+		# load the data
 		recordStart=datetime.datetime(file_blocks[0]['m_date_year'], file_blocks[0]['m_date_month'], file_blocks[0]['m_date_day'],
 									  file_blocks[0]['m_time_hour'], file_blocks[0]['m_time_minute'], file_blocks[0]['m_time_second'], file_blocks[0]['m_time_hsecond'])
+		
 		ana_sig={'file':[],'name':[],'ch_id':[],'sampling_rate':[],'datetime':[],'t_start':[],'data':[]}
 		for ind_chan in ind_valid_chan:
 			if file_blocks[list_chan[ind_chan]]['m_Name'] in list(channelsKeep.values()) or file_blocks[list_chan[ind_chan]]['m_Name'] in list(channelsKeep):
@@ -314,7 +315,7 @@ TypeH_Header = [
 	('m_date_month', 'B'),
 	('m_date_year', 'H'),
 	('m_date_dayofweek', 'B'),
-	('blank', 'x'),  # one byte blank because of the 2 bytes alignement
+	('blank', 'x'),  # one byte blank because of the 2 bytes alignment
 	('m_MinimumTime', 'd'),
 	('m_MaximumTime', 'd'),
 	('m_EraseCount', 'l'),
@@ -328,9 +329,9 @@ Type0_SetBoards = [
 	('m_nextBlock', 'l'),
 	('m_BoardCount', 'h'),
 	('m_GroupCount', 'h'),
-	('m_placeMainWindow', '{}s')]  # WARNING: unknown type ('x' is wrong)
+	('m_placeMainWindow', '{}s')]  # unknown type ('x' is wrong)
 
-Type1_Boards = [  # WARNING: needs to be checked
+Type1_Boards = [  # needs to be checked
 	('m_nextBlock', 'l'),		#4
 	('m_Number', 'h'),			#6
 	('m_countChannel', 'h'),	#8
@@ -338,21 +339,21 @@ Type1_Boards = [  # WARNING: needs to be checked
 	('m_countAnOut', 'h'),		#12
 	('m_countDigIn', 'h'),		#14
 	('m_countDigOut', 'h'),		#16
-	('m_TrigCount', 'h'),		#18	# not defined in 5.3.3 but appears in 5.5.1 and seems to really exist in files, WARNING: check why 'm_TrigCount is not in the C code [2]
+	('m_TrigCount', 'h'),		#18
 	('m_Amplitude', 'f'),		#22
-	('m_cSampleRate', 'f'),		#26	# sample rate seems to be given in kHz
+	('m_cSampleRate', 'f'),		#26
 	('m_Duration', 'f'),		#30
 	('m_nPreTrigmSec', 'f'),	#34
 	('m_nPostTrigmSec', 'f'),	#38
 	('m_TrgMode', 'h'),			#40
-	('m_LevelValue', 'h'),		#42 # after this line, 5.3.3 is wrong,check example in 5.5.1 for the right fields, WARNING: check why the following part is not corrected in the C code [2]
+	('m_LevelValue', 'h'),		#42
 	('m_nSamples', 'h'),		#44
 	('m_fRMS', 'f'),			#48
 	('m_ScaleFactor', 'f'),		#52
 	('m_DapTime', 'f'),			#56
 	('m_nameBoard', '{}s')]
-# ('m_DiscMaxValue','h'), # WARNING: should this exist?
-# ('m_DiscMinValue','h') # WARNING: should this exist?
+# ('m_DiscMaxValue','h'), # should this exist?
+# ('m_DiscMinValue','h') # should this exist?
 
 Type2_DefBlocksChannels = [
     # common parameters for all types of channels
@@ -365,11 +366,11 @@ Type2_DefBlocksChannels = [
 
 Type2_SubBlockContinuousChannels = [
     # continuous channels parameters
-    ('blank', '2x'),  # WARNING: this is not in the specs but it seems needed
+    ('blank', '2x'),  # this is not in the specs but it is needed
     ('m_Amplitude', 'f'),
     ('m_SampleRate', 'f'),
     ('m_ContBlkSize', 'h'),
-    ('m_ModeSpike', 'h'),  # WARNING: the C code [2] uses usigned short here
+    ('m_ModeSpike', 'h'),
     ('m_Duration', 'f'),
     ('m_bAutoScale', 'h'),
     ('m_Name', '{}s')]
@@ -404,20 +405,16 @@ Type2_SubBlockDigitalChannels = [
     ('m_SampleRate', 'f'),
     ('m_SaveTrigger', 'h'),
     ('m_Duration', 'f'),
-    ('m_PreviousStatus', 'h'),  # WARNING: check difference with C code here
+    ('m_PreviousStatus', 'h'),
     ('m_Name', '{}s')]
 
 Type2_SubBlockUnknownChannels = [
-    # WARNING: We have a mode that doesn't appear in our spec, so we don't
-    # know what are the fields.
-    # It seems that for non-digital channels the beginning is
-    # similar to continuous channels. Let's hope we're right...
     ('blank', '2x'),
     ('m_Amplitude', 'f'),
     ('m_SampleRate', 'f')]
-# there are probably other fields after...
+# there are probably other fields ...
 
-Type6_DefBlockTrigger = [  # WARNING: untested
+Type6_DefBlockTrigger = [  # untested
     ('m_nextBlock', 'l'),
     ('m_Number', 'h'),
     ('m_countChannel', 'h'),
@@ -432,14 +429,14 @@ Type6_DefBlockTrigger = [  # WARNING: untested
     ('m_numChannel8', 'h'),
     ('m_Name', 'c')]
 
-Type3_DefBlockGroup = [  # WARNING: untested
+Type3_DefBlockGroup = [  # untested
     ('m_nextBlock', 'l'),
     ('m_Number', 'h'),
     ('m_Z_Order', 'h'),
     ('m_countSubGroups', 'h'),
-    ('m_placeGroupWindow', 'x'),  # WARNING: unknown type ('x' is wrong)
+    ('m_placeGroupWindow', 'x'),  # unknown type ('x' is wrong)
     ('m_NetLoc', 'h'),
-    ('m_locatMax', 'x'),  # WARNING: unknown type ('x' is wrong)
+    ('m_locatMax', 'x'),  # unknown type ('x' is wrong)
     ('m_nameGroup', 'c')]
 
 Type4_DefBlockSubgroup = [  # WARNING: untested
@@ -449,7 +446,7 @@ Type4_DefBlockSubgroup = [  # WARNING: untested
     ('m_Z_Order', 'h'),
     ('m_countChannel', 'h'),
     ('m_NetLoc', 'h'),
-    ('m_location', 'x'),  # WARNING: unknown type ('x' is wrong)
+    ('m_location', 'x'),  # unknown type ('x' is wrong)
     ('m_bIsMaximized', 'h'),
     ('m_numChannel1', 'h'),
     ('m_numChannel2', 'h'),
@@ -463,22 +460,15 @@ Type4_DefBlockSubgroup = [  # WARNING: untested
 
 Type5_DataBlockOneChannel = [
     ('m_numChannel', 'h')]
-# WARNING: 'm_numChannel' (called 'm_Number' in 5.4.1 of [1]) is supposed
-# to be uint according to 5.4.1 but it seems to be a short in the files
-# (or should it be ushort ?)
 
-# WARNING: In 5.1.1 page 121 of [1], they say "Note: 5 is used for demo
-# purposes, 7 is used for real data", but looking at some real datafiles,
-# it seems that block of type 5 are also used for real data...
-
-Type7_DataBlockMultipleChannels = [  # WARNING: unfinished
-    ('m_lenHead', 'h'),  # WARNING: unknown true type
+Type7_DataBlockMultipleChannels = [  # unfinished
+    ('m_lenHead', 'h'),  # unknown true type
     ('FINT', 'h')]
-# WARNING: there should be data after...
+# there should be data after...
 
-TypeP_DefBlockPeriStimHist = [  # WARNING: untested
+TypeP_DefBlockPeriStimHist = [  # untested
     ('m_Number_Chan', 'h'),
-    ('m_Position', 'x'),  # WARNING: unknown type ('x' is wrong)
+    ('m_Position', 'x'),  # unknown type ('x' is wrong)
     ('m_isStatVisible', 'h'),
     ('m_DurationSec', 'f'),
     ('m_Rows', 'i'),
@@ -486,37 +476,37 @@ TypeP_DefBlockPeriStimHist = [  # WARNING: untested
     ('m_Bins', 'i'),
     ('m_NoTrigger', 'h')]
 
-TypeF_DefBlockFRTachogram = [  # WARNING: untested
+TypeF_DefBlockFRTachogram = [  # untested
     ('m_Number_Chan', 'h'),
-    ('m_Position', 'x'),  # WARNING: unknown type ('x' is wrong)
+    ('m_Position', 'x'),  # unknown type ('x' is wrong)
     ('m_isStatVisible', 'h'),
     ('m_DurationSec', 'f'),
     ('m_AutoManualScale', 'i'),
     ('m_Max', 'i')]
 
-TypeR_DefBlockRaster = [  # WARNING: untested
+TypeR_DefBlockRaster = [  # untested
     ('m_Number_Chan', 'h'),
-    ('m_Position', 'x'),  # WARNING: unknown type ('x' is wrong)
+    ('m_Position', 'x'),  # unknown type ('x' is wrong)
     ('m_isStatVisible', 'h'),
     ('m_DurationSec', 'f'),
     ('m_Rows', 'i'),
     ('m_NoTrigger', 'h')]
 
-TypeI_DefBlockISIHist = [  # WARNING: untested
+TypeI_DefBlockISIHist = [  # untested
     ('m_Number_Chan', 'h'),
-    ('m_Position', 'x'),  # WARNING: unknown type ('x' is wrong)
+    ('m_Position', 'x'),  # unknown type ('x' is wrong)
     ('m_isStatVisible', 'h'),
     ('m_DurationSec', 'f'),
     ('m_Bins', 'i'),
     ('m_TypeScale', 'i')]
 
-Type8_MarkerBlock = [  # WARNING: untested
+Type8_MarkerBlock = [  # untested
     ('m_Number_Channel', 'h'),
-    ('m_Time', 'l')]  # WARNING: check what's the right type here.
+    ('m_Time', 'l')]  # check what's the right type here.
 # It seems that the size of time_t type depends on the system typedef,
 # I put long here but I couldn't check if it is the right type
 
-Type9_ScaleBlock = [  # WARNING: untested
+Type9_ScaleBlock = [  # untested
     ('m_Number_Channel', 'h'),
     ('m_Scale', 'f')]
 
@@ -543,13 +533,20 @@ dict_header_type = {
 
 #%%
 
-# filename=r'/media/veracrypt6/projects/mer_analysis/mer/source/sub-P156/LT1D0.013F0001.mpx'
-# file_in=alphaOmegaIO(r'/media/veracrypt6/projects/mer_analysis/mer/source/sub-P154/LT1D0.016F0001.mpx')
-# file_in=alphaOmegaIO(r'/media/veracrypt6/projects/mer_analysis/mer/source/raw/sub-P189/RT1D2.992F0001.mpx')
+filename=r'/media/veracrypt6/projects/mer_analysis/mer/source/sub-P156/LT1D0.013F0001.mpx'
+#file_in=alphaOmegaIO(r'/media/veracrypt6/projects/mer_analysis/mer/source/sub-P154/LT1D0.016F0001.mpx')
+#file_in=alphaOmegaIO(r'/media/veracrypt6/projects/mer_analysis/mer/source/raw/sub-P189/RT1D2.992F0001.mpx')
 
+chansKeep={
+	'RAW 01 / Central',
+	'RAW 02 / Anterior',
+	'RAW 03 / Posterior',
+	'RAW 04 / Medial',
+	'RAW 05 / Lateral'
+}
 
-# file_data,header=file_in.block_data(chansKeep={'RAW 01 / Central','RAW 02 / Anterior','RAW 03 / Posterior',
-# 												  'RAW 04 / Medial','RAW 05 / Lateral'})
+file_in=alphaOmegaIO(filename)
+file_data,header=file_in.block_data()
 
 
 

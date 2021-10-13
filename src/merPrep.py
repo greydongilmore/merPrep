@@ -62,7 +62,7 @@ def downsample(data, oldFS, newFS):
 	"""
 
 	newNumSamples = int((len(data) / oldFS) * newFS)
-	newData = pd.DataFrame(resample(data, newNumSamples))
+	newData = np.array(resample(data, newNumSamples))
 	
 	return newData
 
