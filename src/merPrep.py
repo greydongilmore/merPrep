@@ -360,6 +360,14 @@ def threshold(data):
 	-------
 		thresholdData: 1D numpy array containing the total threshold value for a 
 				 given signal
+	
+	Reference
+	---------
+		Guillén, P., Martínez-de-Pisón, F., Sánchez, R., Argáez, M., & Velázquez, L. (2011). 
+		Characterization of subcortical structures during deep brain stimulation utilizing 
+		support vector machines. Conference Proceedings: Annual International Conference of 
+		the IEEE Engineering in Medicine and Biology Society. IEEE Engineering in Medicine 
+		and Biology Society. Annual Conference, 2011, 7949–7952.
 	"""
 	
 	i = data-(sum(data)/len(data))
