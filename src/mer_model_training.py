@@ -246,8 +246,16 @@ feature_label_dict={
 #%%
 
 bids_dir=r'/media/veracrypt6/projects/mer_analysis/mer/bids'
+out_path='/media/veracrypt6/projects/mer_analysis/mer/deriv/imgs'
+
+xls = pd.ExcelFile('/media/veracrypt6/projects/stealthMRI/resources/excelFiles/patient_info.xlsx')
+surgical_data=xls.parse('surgical', header=3)
 
 layout = BIDSLayout(bids_dir)
+
+
+#%%
+
 
 cols=['subject','side','chan','depth','mav','mavSlope','variance','mmav1','mmav2','rms','curveLength','zeroCross','threshold','wamp','ssi',
 				 'power','peaks','tkeoTwo','tkeoFour','shapeF','kurtosis','skew','meanF','AvgPowerMU','AvgPowerSU','entropy','waveletStd']
@@ -290,18 +298,7 @@ for isubject in layout.get_subjects()[::-1][9:]:
 
 #%%
 
-import matplotlib
-
-
-out_path='/media/veracrypt6/projects/mer_analysis/mer/deriv/imgs'
-
 downsampleFactor = 5
-
-xls = pd.ExcelFile('/media/veracrypt6/projects/stealthMRI/resources/excelFiles/patient_info.xlsx')
-surgical_data=xls.parse('surgical', header=3)
-
-bids_dir=r'/media/veracrypt6/projects/mer_analysis/mer/bids'
-layout = BIDSLayout(bids_dir)
 
 
 for isubject in layout.get_subjects()[::-1][9:]:
@@ -320,8 +317,10 @@ for isubject in layout.get_subjects()[::-1][9:]:
 			chan_labels=[]
 			for i in np.arange(num_chans):
 				chan_labels.append(f.signal_label(i).decode('latin-1').strip())
-				tempdat = mer.downsample(f.readSignal(i), sf[i]*downsampleFactor,sf[i])
-				tempdat = mer.butterBandpass(tempdat, lowcut = 700, highcut =3000, fs = sf[i], order = 3)
+				
+				tempdat = mer.butterBandpass(f.readSignal(i), lowcut = 700, highcut =3000, fs = sf[i]*downsampleFactor, order = 3)
+				tempdat = mer.downsample(tempdat, sf[i]*downsampleFactor,sf[i])
+				
 				sigbufs[i, :] = tempdat
 			
 			f.close()
@@ -330,9 +329,9 @@ for isubject in layout.get_subjects()[::-1][9:]:
 			epoch_lens=[int(x*(sf[0])) for x in annots[0]]
 			
 			iside=None
-			if any(x in side_label for x in ('lt','25','19')):
+			if any(x in side_label for x in ('lt','25','19','left')):
 				iside='Left'
-			elif any(x in side_label for x in ('rt','26','20')):
+			elif any(x in side_label for x in ('rt','26','20','right')):
 				iside='Right'
 			
 			if iside is not None:
@@ -357,9 +356,11 @@ for isubject in layout.get_subjects()[::-1][9:]:
 						
 						nDepths = len(depths)
 						if sigbufs[ichan,:].max()-sigbufs[ichan,:].min() > 80:
-							yshift = round((sigbufs[ichan,:].max()-sigbufs[ichan,:].min())/100,1)
+ 							yshift = round((sigbufs[ichan,:].max()-sigbufs[ichan,:].min())/100,1)
 						else:
-							yshift = round((sigbufs[ichan,:].max()-sigbufs[ichan,:].min())/10,1)
+ 							yshift = round((sigbufs[ichan,:].max()-sigbufs[ichan,:].min())/10,1)
+
+						#yshift= int((sigbufs[ichan,:].max()-sigbufs[ichan,:].min())/2)
 						
 						#plt.ioff()
 						#plt.ion()
@@ -378,6 +379,9 @@ for isubject in layout.get_subjects()[::-1][9:]:
 						ax.set_xlabel('Time (sec)', fontsize=18, fontweight='bold',labelpad=14)
 						ax.set_ylabel('Depth (mm)', fontsize=18, fontweight='bold')
 						
+						ax.spines['right'].set_visible(False)
+						ax.spines['top'].set_visible(False)
+						
 						ax.tick_params(axis='both', which='major', labelsize=14)
 						handles=[]
 						if not np.isnan(dorsal) and not np.isnan(ventral):
@@ -386,8 +390,7 @@ for isubject in layout.get_subjects()[::-1][9:]:
 							
 							ax.axhline(idx_dor*yshift, color='#4daf4a', linewidth=2,zorder=11,label='Dorsal Border')
 							ax.axhline(idx_ven*yshift, color='#e41a1c', linewidth=2,zorder=11,label='Ventral Border')
-							
-							
+							ax.add_patch(mpatches.Rectangle((0, idx_dor*yshift), len(feature.T), ((idx_ven-idx_dor))*yshift, alpha=.3, facecolor='#0868ac', zorder=10, label='STN'))
 							
 							#ax.add_patch(mpatches.Rectangle((0, -yshift), len(feature.T), (idx_dor+1)*yshift, alpha=.4, facecolor='#0868ac', zorder=10))
 							#ax.add_patch(mpatches.Rectangle((0, idx_ven*yshift), len(feature.T), ((nDepths-idx_ven)+1)*yshift, alpha=.4, facecolor='#0868ac', zorder=10))
@@ -401,9 +404,9 @@ for isubject in layout.get_subjects()[::-1][9:]:
 						plt.subplots_adjust(right=0.8,top=0.95)
 						
 						plt.title(f"sub-{isubject} {iside} Side: {channelLabels[chan_labels[ichan]]} Trajectory", size=24, fontweight="bold",y=1.01)
-						plt.show()
+						#plt.show()
 						fileName=f"sub-{isubject}_side-{iside.lower()}_channel-{channelLabels[chan_labels[ichan]].lower()}_raw"
-						#plt.savefig(os.path.join(out_path,f"{fileName}.svg"),transparent=True,dpi=400)
+						plt.savefig(os.path.join(out_path,f"{fileName}.svg"),transparent=True,dpi=500)
 						plt.savefig(os.path.join(out_path,f"{fileName}.png"),transparent=True,dpi=500)
 						plt.savefig(os.path.join(out_path,f"{fileName}_white.png"),transparent=False,dpi=500)
 						plt.close()
