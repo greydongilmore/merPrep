@@ -88,8 +88,7 @@ def compute_features(chan_labels, sigbufs, annots, sf,ichan):
 			mer.KUR(tempData), 
 			mer.SKW(tempData), 
 			mer.meanFrq(tempData,sampling_f),
-			mer.powerAVG(mer.butterBandpass(tempData, lowcut = 500, highcut = 1000, fs = sampling_f, order = 5)),
-			mer.powerAVG(mer.butterBandpass(tempData, lowcut = 1000, highcut = 3000, fs = sampling_f, order = 5)),
+			mer.powerAVG(mer.butterBandpass(tempData, lowcut = 500, highcut = 3000, fs = sampling_f, order = 5)),
 			mer.entropy(tempData),
 			mer.wavlet(tempData, nLevels = 5, waveletName = 'db1', timewindow = False, windowSize = 0, Fs=sf)
 			])
@@ -231,7 +230,6 @@ feature_label_dict={
 	'skew':'skewness',
 	'meanF':'mean frequency',
 	'AvgPowerMU': 'multi-unit power',
-	'AvgPowerSU': 'single-unit power',
 	'waveletStd':'wavelet transform',
 	'mmav2':'Modified mean abs val 2',
 	'mmav1':'Modified mean abs val 1',
@@ -258,7 +256,7 @@ layout = BIDSLayout(bids_dir)
 
 
 cols=['subject','side','chan','depth','mav','mavSlope','variance','mmav1','mmav2','rms','curveLength','zeroCross','threshold','wamp','ssi',
-				 'power','peaks','tkeoTwo','tkeoFour','shapeF','kurtosis','skew','meanF','AvgPowerMU','AvgPowerSU','entropy','waveletStd']
+				 'power','peaks','tkeoTwo','tkeoFour','shapeF','kurtosis','skew','meanF','AvgPowerMU','entropy','waveletStd']
 
 ignore_subs=['P061']
 
@@ -286,7 +284,7 @@ for isubject in layout.get_subjects()[::-1][9:]:
 				f.close()
 				
 				signal_features=[]
-				pool = Pool(5)
+				pool = Pool(3)
 				func = partial(compute_features, chan_labels,sigbufs,annots,sf)
 				
 				for result in pool.imap(func, chan_labels):
