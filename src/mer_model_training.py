@@ -66,32 +66,40 @@ def compute_features(chan_labels, sigbufs, annots, sf,ichan):
 		
 		signal_features.append([
 			isubject, 
-			side_label,
-			ichan,
-			depths[idepth],
-			mer.MAV(tempData), 
-			MAVtemp,
-			mer.VAR(tempData), 
-			mer.MMAV1(tempData), 
-			mer.MMAV2(tempData), 
-			mer.RMS(tempData), 
-			mer.curveLen(tempData), 
-			mer.zeroCross(tempData,10), 
-			mer.threshold(tempData), 
-			mer.WAMP(tempData,10), 
-			mer.SSI(tempData), 
-			mer.powerAVG(tempData), 
-			mer.peaksNegPos(tempData), 
-			mer.tkeoTwo(tempData), 
-			mer.tkeoFour(tempData),
-			mer.shapeFactor(tempData), 
-			mer.KUR(tempData), 
-			mer.SKW(tempData), 
-			mer.meanFrq(tempData,sampling_f),
-			mer.powerAVG(mer.butterBandpass(tempData, lowcut = 500, highcut = 3000, fs = sampling_f, order = 5)),
-			mer.entropy(tempData),
-			mer.wavlet(tempData, nLevels = 5, waveletName = 'db1', timewindow = False, windowSize = 0, Fs=sf)
+ 			side_label,
+ 			ichan,
+ 			depths[idepth],
+			mer.peaksPos(tempData),
 			])
+		
+# 		signal_features.append([
+#  			isubject, 
+#  			side_label,
+#  			ichan,
+#  			depths[idepth],
+#  			mer.MAV(tempData), 
+#  			MAVtemp,
+#  			mer.VAR(tempData), 
+#  			mer.MMAV1(tempData), 
+#  			mer.MMAV2(tempData), 
+#  			mer.RMS(tempData), 
+#  			mer.curveLen(tempData), 
+#  			mer.zeroCross(tempData,10), 
+#  			mer.threshold(tempData), 
+#  			mer.WAMP(tempData,10), 
+#  			mer.SSI(tempData), 
+#  			mer.powerAVG(tempData), 
+#  			mer.peaksNegPos(tempData), 
+#  			mer.tkeoTwo(tempData), 
+#  			mer.tkeoFour(tempData),
+#  			mer.shapeFactor(tempData), 
+#  			mer.KUR(tempData), 
+#  			mer.SKW(tempData), 
+#  			mer.meanFrq(tempData,sampling_f),
+#  			mer.powerAVG(mer.butterBandpass(tempData, lowcut = 500, highcut = 3000, fs = sampling_f, order = 5)),
+#  			mer.entropy(tempData),
+#  			mer.wavlet(tempData, nLevels = 5, waveletName = 'db1', timewindow = False, windowSize = 0, Fs=sf)
+#  			])
 		
 		print(f"Finished channel {ichan} depth {depths[idepth]}")
 		
@@ -224,6 +232,7 @@ feature_label_dict={
 	'wamp':'willison amplitude',
 	'ssi':'simple square integral',
 	'peaks':'peaks',
+	'peakPos':'eak Density',
 	'tkeoTwo':'Teager-Kaiser energy 2',
 	'tkeoFour':'Teager-Kaiser energy 4',
 	'shapeF':'shape factor',
@@ -257,6 +266,7 @@ layout = BIDSLayout(bids_dir)
 
 cols=['subject','side','chan','depth','mav','mavSlope','variance','mmav1','mmav2','rms','curveLength','zeroCross','threshold','wamp','ssi',
 				 'power','peaks','tkeoTwo','tkeoFour','shapeF','kurtosis','skew','meanF','AvgPowerMU','entropy','waveletStd']
+cols=['subject','side','chan','depth','peakPos']
 
 ignore_subs=['P061']
 
@@ -265,33 +275,34 @@ for isubject in layout.get_subjects()[::-1][9:]:
 		edf_files=layout.get(subject=isubject, extension='.edf', return_type='filename')
 		for iedf in edf_files:
 			outname=os.path.join(iedf.split(f'/bids/sub-{isubject}')[0],'deriv','features2',f'sub-{isubject}',os.path.splitext(os.path.basename(iedf))[0].replace('ieeg','features')+'.pkl')
-			if not os.path.exists(outname):
-				if not os.path.exists(os.path.dirname(outname)):
-					os.makedirs(os.path.dirname(outname))
+			#if not os.path.exists(outname):
+			if not os.path.exists(os.path.dirname(outname)):
+				os.makedirs(os.path.dirname(outname))
+			
+			f = pyedflib.EdfReader(iedf)
+			annots=f.readAnnotations()
+			n = f.signals_in_file
+			n_samps=f.getNSamples()[0]
+			sf=f.getSampleFrequencies()
+			side_label=f.admincode.decode('latin-1')
+			sigbufs = np.zeros((n,n_samps))
+			chan_labels=[]
+			for i in np.arange(n):
+				chan_labels.append(f.signal_label(i).decode('latin-1').strip())
+				sigbufs[i, :] = mer.butterBandpass(f.readSignal(i), lowcut = 550, highcut = 4500, fs = sf[i], order = 3)
 				
-				f = pyedflib.EdfReader(iedf)
-				annots=f.readAnnotations()
-				n = f.signals_in_file
-				n_samps=f.getNSamples()[0]
-				sf=f.getSampleFrequencies()
-				side_label=f.admincode.decode('latin-1')
-				sigbufs = np.zeros((n,n_samps))
-				chan_labels=[]
-				for i in np.arange(n):
-					chan_labels.append(f.signal_label(i).decode('latin-1').strip())
-					sigbufs[i, :] = mer.butterBandpass(f.readSignal(i), lowcut = 550, highcut = 4500, fs = sf[i], order = 3)
-					
-				f.close()
-				
-				signal_features=[]
-				pool = Pool(3)
-				func = partial(compute_features, chan_labels,sigbufs,annots,sf)
-				
-				for result in pool.imap(func, chan_labels):
-					signal_features.append(result)
-				
-				df1 = pd.DataFrame(np.vstack(signal_features), columns=cols)
-				df1.to_pickle(outname)
+			f.close()
+			
+			signal_features=[]
+			pool = Pool(3)
+			func = partial(compute_features, chan_labels,sigbufs,annots,sf)
+			
+			for result in pool.imap(func, chan_labels):
+				signal_features.append(result)
+			
+			
+			df1 = pd.DataFrame(np.vstack(signal_features), columns=cols)
+			df1.to_pickle(outname)
 
 
 #%%
@@ -420,6 +431,7 @@ for isubject in layout.get_subjects()[::-1][9:]:
 #							in_patch = mpatches.Patch(color='#dede00', label='Label 1')
 #							handles.append(in_patch)
 #%%
+
 class ScalarFormatterForceFormat(mtick.ScalarFormatter):
 	def _set_format(self):  # Override function that finds format to use.
 		self.format = "%1.1f"  # Give format here
@@ -534,6 +546,90 @@ for isubject in subjects:
 		
 		print(f'Finished {isubject}')
 
+#%%
+
+
+subplot_letter = [chr(i) for i in range(ord('a'),ord('h')+1)]
+
+
+for isubject in layout.get_subjects()[::-1][9:]:
+	isub=int(''.join([x for x in isubject if x.isnumeric()]))
+	sub_data=surgical_data[surgical_data['subjectNumber']==isub]
+	
+	sub_plot_out=os.path.join(out_plot_path,'sub-'+isubject)
+	if not os.path.exists(sub_plot_out):
+		os.makedirs(sub_plot_out)
+	
+	if sub_data['target'].values[0].lower() =='stn':
+		feature_files=glob.glob(os.path.join(os.path.dirname(bids_dir),'deriv','features2','sub-'+isubject,'*'))
+		for ifeat in feature_files:
+			with open(ifeat, "rb") as file:
+				feats = pickle.load(file)
+			
+			class_labels=np.zeros((1, feats.shape[0]))[0]
+			for iside in np.unique(feats['side']):
+				side_data=feats[feats['side']==iside]
+				if any(x in iside for x in ('rt','right')):
+					side_label='right'
+				else:
+					side_label = 'left'
+				
+				for ichan in np.unique(side_data['chan']):
+					fileName=f"{isubject}_side-{side_label.lower()}_channel-{channelLabels[ichan].lower()}_features"
+					
+					dorsal=sub_data[f'Surg{side_label.title()[0]}{ichan.title()}In'].values[0]
+					ventral=sub_data[f'Surg{side_label.title()[0]}{ichan.title()}Out'].values[0]
+					min_idx=feats[(feats['side']==iside) & (feats['chan']==ichan)]['depth'].index[1]
+					depths=feats[(feats['side']==iside) & (feats['chan']==ichan)]['depth'].to_numpy().astype(float)[1:]
+					
+					
+					for ifeature in range(feats.iloc[:,4:].shape[1]):
+						
+						plt.ion()
+						fig, axs = plt.subplots(figsize=(14,8))
+						
+						feature = feats[(feats['chan']==ichan)].iloc[:,ifeature+4].to_numpy().astype(float)[1:]
+						
+						sns.lineplot(x=np.arange(0, len(depths), 1),y=feature, color='black', linewidth=2, ax=axs)
+						axs.xaxis.set_ticks(np.arange(0, len(depths), 1))
+						axs.xaxis.set_ticklabels(['{:.2f}'.format(x) for x in depths],rotation=45, ha="right",rotation_mode="anchor")
+						axs.set_ylabel(feature_label_dict[list(feats)[ifeature+4]].title(), fontsize=18, fontweight='bold')
+						axs.tick_params(axis='both', which='major', labelsize=14)
+						axs.yaxis.set_label_coords(-0.08,.5)
+						axs.set_xlim(0,len(depths)-1)
+						axs.set_xlabel('Depth (mm)', fontsize=18, fontweight='bold')
+						
+						tickLocs_x=axs.get_yticks()
+						cadenceX= tickLocs_x[2] - tickLocs_x[1]
+						axs.set_ylim(tickLocs_x[0],tickLocs_x[-1])
+						tickLabels=['{:.2f}'.format(x) for x in tickLocs_x]
+						axs.set_yticks(tickLocs_x, minor=False), axs.set_yticklabels(tickLabels)
+						yfmt = ScalarFormatterForceFormat()
+						yfmt.set_powerlimits((-2,2))
+						axs.yaxis.set_major_formatter(yfmt)
+						axs.ticklabel_format(style='sci', axis='y', scilimits=(-2,2))
+						axs.grid()
+												
+						if not np.isnan(dorsal) and not np.isnan(ventral):
+							idx_dor,val_dor = min(enumerate(depths), key=lambda x: abs(x[1]-dorsal))
+							idx_ven,val_ven = min(enumerate(depths), key=lambda x: abs(x[1]-ventral))
+							
+							axs.axvline(idx_dor, color='#4daf4a', linewidth=2,zorder=11,label='Dorsal Border')
+							axs.axvline(idx_ven, color='#e41a1c', linewidth=2,zorder=11,label='Ventral Border')
+							
+							axs.add_patch(mpatches.Rectangle((idx_dor,tickLocs_x[0]), idx_ven-idx_dor, tickLocs_x[-1]+abs(tickLocs_x[0]), alpha=.4, facecolor='#dede00', zorder=10))
+						
+						fig.suptitle(f"{isubject} {side_label.lower()} side: {channelLabels[ichan].lower()} channel", y = 0.98, fontsize=22, fontweight='bold')
+						plt.tight_layout(pad=2)
+						
+						plt_name = list(feats)[ifeature+4]
+						if not os.path.exists(os.path.join(sub_plot_out, fileName + f"_{plt_name}.svg")):
+							plt.savefig(os.path.join(sub_plot_out, fileName + f"_{plt_name}.svg"),transparent=True,dpi=400)
+							plt.savefig(os.path.join(sub_plot_out, fileName + f"_{plt_name}.png"),transparent=True,dpi=400)
+							plt.savefig(os.path.join(sub_plot_out, fileName + f"_{plt_name}_white.png"),transparent=False,dpi=400)
+							
+		print(f'Finished {isubject}')
+    
 #%%
 downsampleFactor = 5
 
