@@ -309,12 +309,11 @@ def zeroCross(data, threshold):
 		for multifunction myoelectric control. IEEE Transactions on 
 		Bio-Medical Engineering, 40(1), 82–94.
 	"""
-	
-	i = abs(data[:-1]-data[1:]) > threshold
-	ind = data[np.nonzero(i)[0]]
-	
-	zeroCrossData = len(np.where(np.diff(np.sign(ind)))[0])
-	
+	sign = lambda z: (1, -1)[z < 0]
+
+	i = abs(np.array([sign(x) for x in data[1:]]) - np.array([sign(x) for x in data[:-1]]))
+	zeroCrossData = sum(i)/(len(data))
+		
 	return zeroCrossData
 
 def slopeSign(data):
@@ -472,7 +471,7 @@ def peaksNegPos(data):
 		
 	i = [sign(z) for z in (data[2:]-data[1:-1])]
 	j = [sign(z) for z in (data[1:-1]-data[:-2])]
-	k = [a_i - b_i for a_i, b_i in zip(i, j)]
+	k = [a_i - b_i for a_i, b_i in zip(j, i)]
 	
 	peaksNegPosData = [max([0,z]) for z in k]
 	peaksNegPosData = sum(peaksNegPosData)/(len(data)-2)
