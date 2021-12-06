@@ -219,41 +219,44 @@ def outlier_removal_IQR(data):
 	
 	return data
 
+
 def sorted_nicely(data, reverse = False):
 	convert = lambda text: int(text) if text.isdigit() else text
 	alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
 	
 	return sorted(data, key = alphanum_key, reverse=reverse)
 
-
 class ScalarFormatterForceFormat(mtick.ScalarFormatter):
 	def _set_format(self):  # Override function that finds format to use.
 		self.format = "%1.1f"  # Give format here
 
-
 feature_label_dict={
-	'mav':'Mean abs val',
-	'mavSlope':'Mean abs val\nslope',
-	'mmav1':'Modified mean\nabs val 1',
-	'mmav2':'Modified mean\nabs val 2',
-	'variance':'variance',
-	'rms':'root mean\nsquare',
-	'curveLength':'curve length',
-	'zeroCross':'zero crossings',
-	'threshold':'threshold',
-	'wamp':'willison\namplitude',
-	'ssi':'simple square\nintegral',
-	'power':'Power',
-	'peaks':'peaks',
-	'tkeoTwo':'Teager-Kaiser\nenergy 2',
-	'tkeoFour':'Teager-Kaiser\nenergy 4',
-	'shapeF':'shape factor',
-	'skew':'skewness',
-	'kurtosis':'Kurtosis',
-	'entropy':'Entropy',
-	'meanF':'mean frequency',
-	'AvgPowerMU': 'multi-unit\npower',
-	'waveletStd':'wavelet\ntransform'
+	'time':{
+		'mav':'Mean abs val',
+		'mavSlope':'Mean abs val\nslope',
+		'mmav1':'Modified mean\nabs val 1',
+		'mmav2':'Modified mean\nabs val 2',
+		'variance':'variance',
+		'rms':'root mean\nsquare',
+		'curveLength':'curve length',
+		'zeroCross':'zero crossings',
+		'threshold':'threshold',
+		'wamp':'willison\namplitude',
+		'ssi':'simple square\nintegral',
+		'power':'Power',
+		'peaks':'peaks',
+		'tkeoTwo':'Teager-Kaiser\nenergy 2',
+		'tkeoFour':'Teager-Kaiser\nenergy 4',
+		'shapeF':'shape factor',
+		'skew':'skewness',
+		'kurtosis':'Kurtosis',
+		'entropy':'Entropy'
+	},
+	'freq':{
+		'meanF':'mean frequency',
+		'AvgPowerMU': 'multi-unit\npower',
+		'waveletStd':'wavelet\ntransform'
+	}
 }
 
 
@@ -265,6 +268,9 @@ out_plot_path = r'/media/veracrypt6/projects/mer_analysis/mer/deriv/feature_plot
 
 xls = pd.ExcelFile('/media/veracrypt6/projects/stealthMRI/resources/excelFiles/patient_info.xlsx')
 surgical_data=xls.parse('surgical', header=3)
+
+out_path='/media/greydon/KINGSTON34/phdCandidacy/thesis/imgs'
+out_plot_path = r'/media/veracrypt6/projects/mer_analysis/mer/deriv/feature_plots'
 
 layout = BIDSLayout(bids_dir)
 
@@ -448,21 +454,14 @@ for isubject in sorted_nicely([x for x in layout.get_subjects()[::-1][9:] if x n
 #							handles.append(in_patch)
 #%%
 
-class ScalarFormatterForceFormat(mtick.ScalarFormatter):
-	def _set_format(self):  # Override function that finds format to use.
-		self.format = "%1.1f"  # Give format here
 
-out_path='/media/greydon/KINGSTON34/phdCandidacy/thesis/imgs'
-out_plot_path = r'/media/veracrypt6/projects/mer_analysis/mer/deriv/feature_plots'
-
-xls = pd.ExcelFile('/media/veracrypt6/projects/stealthMRI/resources/excelFiles/patient_info.xlsx')
-surgical_data=xls.parse('surgical', header=3)
 bids_dir=r'/media/veracrypt6/projects/mer_analysis/mer/bids'
 
 subjects=[os.path.basename(x) for x in glob.glob(os.path.join(os.path.dirname(bids_dir),'deriv','features','*')) if os.path.isdir(os.path.join(os.path.dirname(bids_dir),'deriv','features',x))]
 
 subplot_letter = [chr(i) for i in range(ord('a'),ord('h')+1)]
 
+cols_ignore=['peakPos']
 
 for isubject in subjects:
 	isub=int(''.join([x for x in isubject if x.isnumeric()]))
@@ -477,9 +476,8 @@ for isubject in subjects:
 			with open(ifeat, "rb") as file:
 				feats = pickle.load(file)
 			
-			feats=feats.reindex(columns=['subject','side','chan','depth'] + list(feature_label_dict))
+			feats = feats[[x for x in list(feats) if x not in cols_ignore and x in ['subject','side','chan','depth']+sum([list(feature_label_dict[y]) for y in list(feature_label_dict)],[])]]
 			
-			class_labels=np.zeros((1, feats.shape[0]))[0]
 			for iside in np.unique(feats['side']):
 				side_data=feats[feats['side']==iside]
 				if any(x in iside for x in ('rt','right')):
@@ -487,95 +485,99 @@ for isubject in subjects:
 				else:
 					side_label = 'left'
 				
-				for ichan in np.unique(side_data['chan']):
-					fileName=f"{isubject}_side-{side_label.lower()}_channel-{channelLabels[ichan].lower()}_features"
-					
-					dorsal=sub_data[f'Surg{side_label.title()[0]}{ichan.title()}In'].values[0]
-					ventral=sub_data[f'Surg{side_label.title()[0]}{ichan.title()}Out'].values[0]
-					min_idx=feats[(feats['side']==iside) & (feats['chan']==ichan)]['depth'].index[1]
-					depths=feats[(feats['side']==iside) & (feats['chan']==ichan)]['depth'].to_numpy().astype(float)[1:]
-					
-					ax_cnt = 3
-					firstPlot=True
-					plot_cnt=1
-					
-					#plt.ion()
-					for ifeature in range(feats.iloc[:,4:].shape[1]):
-						if ax_cnt == 3:
-							if not firstPlot:
-								handles, labels = axs[ax_cnt].get_legend_handles_labels()
-								plt.legend(bbox_to_anchor= (1.28, 2.75), shadow = True, facecolor = 'white',handles=handles,fontsize=14)
-								fig.suptitle(f"{isubject} {side_label.lower()} side: {channelLabels[ichan].lower()} channel", y = 0.98, fontsize=22, fontweight='bold')
+				for idomain in list(feature_label_dict):
+					for ichan in np.unique(side_data['chan']):
+						fileName=f"{isubject}_side-{side_label.lower()}_channel-{channelLabels[ichan].lower()}_{idomain}_features"
+						
+						dorsal=sub_data[f'Surg{side_label.title()[0]}{ichan.title()}In'].values[0]
+						ventral=sub_data[f'Surg{side_label.title()[0]}{ichan.title()}Out'].values[0]
+						min_idx=feats[(feats['side']==iside) & (feats['chan']==ichan)]['depth'].index[1]
+						depths=feats[(feats['side']==iside) & (feats['chan']==ichan)]['depth'].to_numpy().astype(float)[1:]
+						
+						ax_cnt = 3
+						firstPlot=True
+						plot_cnt=1
+						
+						#plt.ion()
+						
+						for ifeature in feature_label_dict[idomain].keys():
+							if ax_cnt == 3:
+								if not firstPlot:
+									handles, labels = axs[ax_cnt].get_legend_handles_labels()
+									plt.legend(bbox_to_anchor= (1.28, 2.75), shadow = True, facecolor = 'white',handles=handles,fontsize=14)
+									fig.suptitle(f"{isubject} {side_label.lower()} side: {channelLabels[ichan].lower()} channel", y = 0.98, fontsize=22, fontweight='bold')
+									
+									if not os.path.exists(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.svg")):
+										plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.svg"),transparent=True,dpi=400)
+										plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.png"),transparent=True,dpi=400)
+										plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}_white.png"),transparent=False,dpi=400)
+									plt.close()
+									plot_cnt +=1
+									
+								nrow = 3; ncol = 1;
+								plt.ioff()
+								fig, axs = plt.subplots(nrows=nrow+1, ncols=ncol,figsize=(14,8), sharex=True)
+								#axs=axs.T
+								ax_cnt = 0
+								plt.subplots_adjust(left=0.18,right=0.8)
+								firstPlot=True
+							else:
+								firstPlot=False
+								ax_cnt += 1
+							
+							scaler = MinMaxScaler()
+							feature = scaler.fit_transform(feats[(feats['chan']==ichan)].loc[:,ifeature].to_numpy().astype(float)[1:].reshape(-1, 1)).T[0]
+							
+							sns.lineplot(x=np.arange(0, len(depths), 1),y=feature, color='black', linewidth=2, ax=axs[ax_cnt])
+							axs[ax_cnt].xaxis.set_ticks(np.arange(0, len(depths), 1))
+							axs[ax_cnt].xaxis.set_ticklabels(['{:.2f}'.format(x) for x in depths],rotation=45, ha="right",rotation_mode="anchor")
+							axs[ax_cnt].set_ylabel(feature_label_dict[idomain][ifeature].title(), fontsize=14, fontweight='bold',rotation='horizontal',ha='right', va="center")
+							axs[ax_cnt].tick_params(axis='both', which='major', labelsize=12)
+							axs[ax_cnt].yaxis.set_label_coords(-0.08,.5)
+							axs[ax_cnt].set_xlim(0,len(depths)-1)
+							axs[ax_cnt].set_xlabel('Depth (mm)', fontsize=18, fontweight='bold')
+							
+							tickLocs_x=axs[ax_cnt].get_yticks()
+							cadenceX= tickLocs_x[2] - tickLocs_x[1]
+							axs[ax_cnt].set_ylim(tickLocs_x[0],tickLocs_x[-1])
+							tickLabels=['{:.2f}'.format(x) for x in tickLocs_x]
+							axs[ax_cnt].set_yticks(tickLocs_x, minor=False), axs[ax_cnt].set_yticklabels(tickLabels)
+							yfmt = ScalarFormatterForceFormat()
+							yfmt.set_powerlimits((-2,2))
+							axs[ax_cnt].yaxis.set_major_formatter(yfmt)
+							axs[ax_cnt].ticklabel_format(style='sci', axis='y', scilimits=(-2,2))
+							axs[ax_cnt].grid()
+							
+							#axs[ax_cnt].text(-.15, 1,f'{subplot_letter[ax_cnt]})', transform=axs[ax_cnt].transAxes, fontsize=15, fontweight='bold')
+							
+							#plt.show()
+							#plt.draw()
+							idx_tar,val_tar = min(enumerate(depths), key=lambda x: abs(x[1]-0))
+							axs[ax_cnt].axvline(idx_tar, color='black', ls='--', linewidth=1,zorder=11,label='Target Point')
+							
+							if not np.isnan(dorsal) and not np.isnan(ventral):
+								idx_dor,val_dor = min(enumerate(depths), key=lambda x: abs(x[1]-dorsal))
+								idx_ven,val_ven = min(enumerate(depths), key=lambda x: abs(x[1]-ventral))
 								
-								if not os.path.exists(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.svg")):
-									plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.svg"),transparent=True,dpi=400)
-									plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.png"),transparent=True,dpi=400)
-									plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}_white.png"),transparent=False,dpi=400)
-								plt.close()
-								plot_cnt +=1
+								axs[ax_cnt].axvline(idx_dor, color='#4daf4a', linewidth=2,zorder=11,label='Dorsal Border')
+								axs[ax_cnt].axvline(idx_ven, color='#e41a1c', linewidth=2,zorder=11,label='Ventral Border')
 								
-							nrow = 3; ncol = 1;
-							plt.ioff()
-							fig, axs = plt.subplots(nrows=nrow+1, ncols=ncol,figsize=(14,8), sharex=True)
-							#axs=axs.T
-							ax_cnt = 0
-							plt.subplots_adjust(left=0.18,right=0.8)
-							firstPlot=True
-						else:
-							firstPlot=False
+								axs[ax_cnt].add_patch(mpatches.Rectangle((idx_dor,tickLocs_x[0]), idx_ven-idx_dor, tickLocs_x[-1]+abs(tickLocs_x[0]), alpha=.4, facecolor='#dede00', zorder=10, label='STN'))
+						
+						legend_idx = ax_cnt
+						while ax_cnt <3:
 							ax_cnt += 1
+							fig.delaxes(axs[ax_cnt])
 						
-						feature = feats[(feats['chan']==ichan)].iloc[:,ifeature+4].to_numpy().astype(float)[1:]
-						sns.lineplot(x=np.arange(0, len(depths), 1),y=feature, color='black', linewidth=2, ax=axs[ax_cnt])
-						axs[ax_cnt].xaxis.set_ticks(np.arange(0, len(depths), 1))
-						axs[ax_cnt].xaxis.set_ticklabels(['{:.2f}'.format(x) for x in depths],rotation=45, ha="right",rotation_mode="anchor")
-						axs[ax_cnt].set_ylabel(feature_label_dict[list(feats)[ifeature+4]].title(), fontsize=14, fontweight='bold',rotation='horizontal',ha='right', va="center")
-						axs[ax_cnt].tick_params(axis='both', which='major', labelsize=12)
-						axs[ax_cnt].yaxis.set_label_coords(-0.08,.5)
-						axs[ax_cnt].set_xlim(0,len(depths)-1)
-						axs[ax_cnt].set_xlabel('Depth (mm)', fontsize=18, fontweight='bold')
+						handles, labels = axs[legend_idx].get_legend_handles_labels()
+						plt.legend(bbox_to_anchor= (1.28, 2.75-legend_idx), shadow = True, facecolor = 'white',handles=handles,fontsize=14)
+						fig.suptitle(f"{isubject} {side_label.lower()} side: {channelLabels[ichan].lower()} channel", y = 0.98, fontsize=22, fontweight='bold')
 						
-						tickLocs_x=axs[ax_cnt].get_yticks()
-						cadenceX= tickLocs_x[2] - tickLocs_x[1]
-						axs[ax_cnt].set_ylim(tickLocs_x[0],tickLocs_x[-1])
-						tickLabels=['{:.2f}'.format(x) for x in tickLocs_x]
-						axs[ax_cnt].set_yticks(tickLocs_x, minor=False), axs[ax_cnt].set_yticklabels(tickLabels)
-						yfmt = ScalarFormatterForceFormat()
-						yfmt.set_powerlimits((-2,2))
-						axs[ax_cnt].yaxis.set_major_formatter(yfmt)
-						axs[ax_cnt].ticklabel_format(style='sci', axis='y', scilimits=(-2,2))
-						axs[ax_cnt].grid()
-						
-						#axs[ax_cnt].text(-.15, 1,f'{subplot_letter[ax_cnt]})', transform=axs[ax_cnt].transAxes, fontsize=15, fontweight='bold')
-						
-						#plt.show()
-						#plt.draw()
-						idx_tar,val_tar = min(enumerate(depths), key=lambda x: abs(x[1]-0))
-						axs[ax_cnt].axvline(idx_tar, color='black', ls='--', linewidth=1,zorder=11,label='Target Point')
-						
-						if not np.isnan(dorsal) and not np.isnan(ventral):
-							idx_dor,val_dor = min(enumerate(depths), key=lambda x: abs(x[1]-dorsal))
-							idx_ven,val_ven = min(enumerate(depths), key=lambda x: abs(x[1]-ventral))
-							
-							axs[ax_cnt].axvline(idx_dor, color='#4daf4a', linewidth=2,zorder=11,label='Dorsal Border')
-							axs[ax_cnt].axvline(idx_ven, color='#e41a1c', linewidth=2,zorder=11,label='Ventral Border')
-							
-							axs[ax_cnt].add_patch(mpatches.Rectangle((idx_dor,tickLocs_x[0]), idx_ven-idx_dor, tickLocs_x[-1]+abs(tickLocs_x[0]), alpha=.4, facecolor='#dede00', zorder=10, label='STN'))
-					
-					legend_idx = ax_cnt
-					while ax_cnt <3:
-						ax_cnt += 1
-						fig.delaxes(axs[ax_cnt])
-					
-					handles, labels = axs[legend_idx].get_legend_handles_labels()
-					plt.legend(bbox_to_anchor= (1.28, 2.75-legend_idx), shadow = True, facecolor = 'white',handles=handles,fontsize=14)
-					fig.suptitle(f"{isubject} {side_label.lower()} side: {channelLabels[ichan].lower()} channel", y = 0.98, fontsize=22, fontweight='bold')
-					
-					if not os.path.exists(os.path.join(out_plot_path, fileName + f"_0{plot_cnt}.svg")):
-						plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.svg"),transparent=True,dpi=400)
-						plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.png"),transparent=True,dpi=400)
-						plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}_white.png"),transparent=False,dpi=400)
-					plt.close()
+						if not os.path.exists(os.path.join(out_plot_path, fileName + f"_0{plot_cnt}.svg")):
+							plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.svg"),transparent=True,dpi=400)
+							plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}.png"),transparent=True,dpi=400)
+							plt.savefig(os.path.join(sub_plot_out, fileName + f"_0{plot_cnt}_white.png"),transparent=False,dpi=400)
+						plt.close()
 		
 		print(f'Finished {isubject}')
 
@@ -584,17 +586,18 @@ for isubject in subjects:
 
 subplot_letter = [chr(i) for i in range(ord('a'),ord('h')+1)]
 
+layout.get_subjects()[::-1][9:]
 
-for isubject in sorted_nicely(layout.get_subjects()[::-1][9:])[::-1]:
+
+for isubject in ['P180']:
 	isub=int(''.join([x for x in isubject if x.isnumeric()]))
 	sub_data=surgical_data[surgical_data['subjectNumber']==isub]
-	
 	if sub_data['target'].values[0].lower() =='stn':
 		sub_plot_out=os.path.join(out_plot_path,'sub-'+isubject)
 		if not os.path.exists(sub_plot_out):
 			os.makedirs(sub_plot_out)
-		
-		feature_files=glob.glob(os.path.join(os.path.dirname(bids_dir),'deriv','features2','sub-'+isubject,'*'))
+
+		feature_files=glob.glob(os.path.join(os.path.dirname(bids_dir),'deriv','features','sub-'+isubject,'*'))
 		for ifeat in feature_files:
 			with open(ifeat, "rb") as file:
 				feats = pickle.load(file)
@@ -615,9 +618,12 @@ for isubject in sorted_nicely(layout.get_subjects()[::-1][9:])[::-1]:
 					depths=feats[(feats['side']==iside) & (feats['chan']==ichan)]['depth'].to_numpy().astype(float)[1:]
 					
 					for ifeature in range(feats.iloc[:,4:].shape[1]):
+						
 						plt_name = list(feats)[ifeature+4]
 						if not os.path.exists(os.path.join(sub_plot_out, fileName + f"_{plt_name}.svg")):
 							
+							scaler = StandardScaler()
+							feature = scaler.fit_transform(feats[(feats['chan']==ichan)].iloc[:,ifeature+4].to_numpy().astype(float)[1:].reshape(-1, 1)).T[0]
 							
 							#plt.ioff()
 							#plt.ion()
